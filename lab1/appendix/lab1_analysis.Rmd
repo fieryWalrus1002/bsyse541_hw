@@ -1,0 +1,520 @@
+---
+title: "Lab 1"
+author: "Magnus Wood"
+date: "9-16-21"
+output: html_notebook
+---
+
+```{r}
+library(tidyverse)
+library(grid)
+library(gridExtra)
+library(ggpubr)
+library(patchwork)
+```
+
+
+```{r}
+cal_data <- read_csv("Lab 1_ InsMea/CR1000_1.dat", skip=4)
+col_names <- c("TIMESTAMP", "RECORD", "kohms_Avg", "LWmV_Avg", "PTemp_C_Avg")
+names(cal_data) <- col_names
+
+
+cal_data <- cal_data %>% 
+  filter(RECORD < 118) %>%
+  select(kohms_Avg, LWmV_Avg)
+
+n = length(cal_data$LWmV_Avg)
+
+cal_sum <- cal_data %>%
+  summarize(mean = mean(LWmV_Avg),
+            sd = sd(LWmV_Avg))
+
+
+cal_err <- qt(0.95, df=n-1) * cal_sum$sd / sqrt(n)
+left <- cal_sum$mean - cal_err
+right <- cal_sum$mean + cal_err
+
+print(paste(n, left, right))
+
+print(paste("boolean wetness threshold (95 CI) is: ", right))
+
+```
+
+
+```{r}
+my_data <- read_csv("Lab 1_ InsMea/CR1000_1_corrected.csv")
+# col_names <- c("TIMESTAMP", "RECORD", "kohms_Avg", "LWmV_Avg", "PTemp_C_Avg")
+# names(my_data) <- col_names
+
+# kilohms	mV	Deg C
+
+# 1. Room Temp: 21 C 
+# Trial 1 14:52:00 - 14:57:00
+# Trial 2 14:59:00 - 15:04:00
+# Trial 3 15:06:00 - 15:11:00
+# 
+# 2. Warm: 32 C
+# Trial 1 16:17:00 - 16:22:00
+# Trial 2 16:29:00 - 16:34:00
+# Trial 3 16:44:00 - 16:49:00
+# 
+# 3. Cold (11 C)
+# Trial 1 16:51:00 - 16:56:00
+# Trial 2 16:57:05 - 17:02:05
+# Trial 3 17:05:00 - 17:10:00
+# 
+# 
+# 
+# # trial 1, 14:52:00 - 14:57:0, 205:265
+# trial_1 <- my_data %>% filter(RECORD >= 205, RECORD <= 265) %>% mutate(trial = 1)
+# 
+# # Trial 2 (14:59:00 - 15:04:00) 289:349
+# trial_2 <- my_data %>% filter(RECORD >= 289, RECORD <= 349) %>% mutate(trial = 2)
+# 
+# # Trial 3 (15:06:00 - 15:11:00), 373:433		
+# trial_3 <- my_data %>% filter(RECORD >= 373, RECORD <= 433) %>% mutate(trial = 3)
+# 
+# # combined
+# trial_data <- my_data %>% mutate(trial = ifelse(RECORD >= 205 & RECORD <= 265, 1, ifelse(RECORD >= 289 & RECORD <= 349, 2, ifelse(RECORD >= 373 & RECORD <= 433, 3, 0)))) %>% filter(trial > 0) %>% 
+#   mutate(timepoint = ifelse(RECORD >= 205 & RECORD <= 265, RECORD - 205, ifelse(RECORD >= 289 & RECORD <= 349, RECORD - 289, ifelse(RECORD >= 373 & RECORD <= 433, RECORD - 373, 0))))
+# # 
+# # DF$Den <- ifelse(DF$Denial1 < 1 & !is.na(DF$Denial1) | DF$Denial2 < 1 &  
+# # !is.na(DF$Denial2) | DF$Denial3 < 1 & !is.na(DF$Denial3), "0", "1")
+# # 
+# # Then to ensure a value of NA if all values of the conditional variables are NA:
+# 
+# 
+
+
+
+```
+
+```{r}
+excluded_vars <- c("X9", "date", "record", "room_temp")
+
+trial_data_long <- my_data %>%
+  select(-excluded_vars) %>%
+  #Vs=(2.5 V)/(Rs+101)
+  mutate(mv_237 = 1000 * (2.5/(kohms + 101))) #converting the resistor value of Rs to voltage
+
+pruned_trial_data <- trial_data_long
+
+plot_1 <- trial_data_long %>%
+  ggplot(aes(x=time_s, y=kohms, color=factor(trial))) +
+  geom_line() +
+  facet_wrap(~water_temp) +
+  ylab("kiloohms") +
+  xlab("time (s)") +
+  labs(color = "trial")
+
+plot_1
+ggsave("c:/data/bsyse_541/lab1/237_kohms_behavior.png", width=6, height=3, dpi=1000)
+
+plot_2 <- trial_data_long %>%
+  ggplot(aes(x=time_s, y=mv, color=factor(trial))) +
+  geom_line() +
+  facet_wrap(~water_temp) +
+  ylab("millivolts") +
+  xlab("time (s)") +
+  labs(color = "trial")
+
+plot_2
+ggsave("c:/data/bsyse_541/lab1/lws_mV_behavior.png", width=6, height=3, dpi=1000)
+
+# combine into a figure
+figure <- ggarrange(plot_2, plot_1, common.legend = TRUE,
+                    labels = c("LWS", "237"))
+                                        
+annotate_figure(figure,top = text_grob("Leaf Wetness Sensor signal over time", 
+                   color = "black", face = "bold", size = 12))
+
+ggsave("c:/data/bsyse_541/lab1/all_trials_all_sensors_outliers.png", dpi=1000)
+
+```
+Step 4. Experiment
+
+1) Mount the two wetness sensors at an angle of 45° to ground level in a tree or lab conditions.
+
+2) Use may or may not use an electric fan to generate crosswind at low speed. The fan will locate at a distance of 1 m to sensors and adjust the height to make sure the crosswind blowing directly on the wetness sensors.
+
+3) Upload the program to the data logger and read the real-time data to check if the setup of data logger, and connection of sensors are working properly.
+
+4) Spray the wetness sensors with a water bottle sprayer (equal amounts between replications), while the fan is on. Wipe your wetness sensors gently (do not rub, soak dry 
+with paper towel).
+
+5) The variable that you will change will be water temperature (use three different temperatures, at room temperature, warm, and cold. Measure the water temperature with the thermometer.
+
+6) Replicate the experiment at least three times at temperature setting. Make sure that you measure the water temperature.
+
+Table 4.2. Experiment setup
+Replications
+5.0 min – Temperature 1, 22 C
+5.0 min – Temperature 2, 30 C
+5.0 min – Temperature 3, 11 C
+
+Results and discussion should answer the following questions:
+```{r}
+
+```
+```{r}
+# 1. Does the water temperature affect the sensor sensitivity (each sensor)?
+
+# LWS leaf wetness sensor
+# wet dry transition is normally between 50 and 200 kOhms
+# The resistance of the sensor at the wet/dry transition point should be
+# determined. A sharp change in resistance occurs in the wet-dry transition on
+# the uncoated sensor; normally the transition is between 50 and 200 kΩ. Coated
+# sensors have a poorly defined transition which normally occurs from 20 kΩ to
+# above 1,000 kΩ. For best results, the leaf wetness sensor should be field
+# calibrated since the transition point will vary for different areas and vegetation.
+
+################################ CI 237 sensor (kohms) ##############################################################
+
+# filter/select data 
+pruned_237_kohms <- trial_data_long %>%
+  select(trial, water_temp, time_s, kohms) %>%
+  filter(!(trial == 2 & water_temp == 11)) %>% # excluding 237/11C/Trial2
+  pivot_longer(cols= c('kohms'), names_to="units", values_to="values") %>%
+  mutate(water_temp = as.factor(water_temp))
+  
+# calculate mean and sd
+sample_sum <- pruned_237_kohms %>%
+  group_by(time_s, water_temp) %>%
+  summarize(mean = mean(values),
+            sd   = sd(values),
+            mean_p2sd = mean +  sd,
+            mean_m2sd = mean - sd) %>%
+  ungroup()
+
+mean_237 <- sample_sum
+
+# plot
+p_237_kohms <- ggplot(sample_sum, aes(x = time_s,  color = fct_rev(water_temp))) + 
+  geom_ribbon(aes(ymin = mean_m2sd, ymax = mean_p2sd), alpha = 0.1) +
+  geom_point(aes(y=mean)) +
+  labs(color = "Water Temp (C)") +
+  ylab("kOhms") + xlab("time (seconds)")
+
+# save plot
+ggsave("c:/data/bsyse_541/lab1/237_value_time.png", width=6, height=3, dpi=1000)
+
+################################ CI 237 sensor (mV conversion) ######################################################
+#Vs=(2.5 V)/(Rs+101). 
+#converting the resistor value of Rs to voltage
+pruned_sensorspec_data <- trial_data_long %>%
+  select(trial, water_temp, time_s, kohms) %>% # select only the columns of interest
+  filter(!(trial == 2 & water_temp == 11)) %>% # excluding 237/11C/Trial2
+  mutate(mV = 1000 * (2.5/(kohms + 101))) %>% # convert resistance back to sensor voltage
+  pivot_longer(cols= c('mV'), names_to="units", values_to="values") %>%
+  mutate(water_temp = as.factor(water_temp))
+
+# calculate sample means and sd
+sample_sum <- pruned_sensorspec_data %>%
+  group_by(time_s, water_temp) %>%
+  summarize(mean = mean(values),
+            sd   = sd(values),
+            mean_p2sd = mean +  sd,
+            mean_m2sd = mean - sd) %>%
+  ungroup()
+
+# plot
+p_237_mV <- ggplot(sample_sum, aes(x = time_s,  color = fct_rev(water_temp))) + 
+  geom_ribbon(aes(ymin = mean_m2sd, ymax = mean_p2sd), alpha = 0.1) +
+  geom_point(aes(y=mean)) +
+  labs(color = "Water Temp (C)") +
+  ylab("mV") + xlab("time (seconds)")
+
+# save plot
+ggsave("c:/data/bsyse_541/lab1/237_mVconversionvalue_time.png", width=6, height=3, dpi=1000)
+
+################################### CI LWS sensor (mV)    ################################################
+# LWS sensor is in mV
+pruned_sensorspec_data <- trial_data_long %>%
+  select(trial, water_temp, time_s, mv) %>% # select only the columns of interest
+  filter(!(trial == 3 & water_temp == 21)) %>% # excluding LWS trial 3 in temp 21
+  pivot_longer(cols= c('mv'), names_to="units", values_to="values") %>%
+  mutate(water_temp = as.factor(water_temp))
+
+# sample means and sd
+sample_sum <- pruned_sensorspec_data %>%
+  group_by(time_s, water_temp) %>%
+  summarize(mean = mean(values),
+            sd   = sd(values),
+            mean_p2sd = mean + sd,
+            mean_m2sd = mean - sd) %>%
+  ungroup()
+
+mean_lws <- sample_sum
+# plot
+
+p_lws_mv <- ggplot(sample_sum, aes(x = time_s,  color = fct_rev(water_temp))) + 
+  geom_ribbon(aes(ymin = mean_m2sd, ymax = mean_p2sd), alpha = 0.1) +
+  geom_point(aes(y=mean)) +
+  labs(color = "Water Temp (C)") +
+  ylab("milliVolts") + xlab("time (seconds)")
+
+# save plot
+ggsave("c:/data/bsyse_541/lab1/lws_value_time.png", width=6, height=3, dpi=1000)
+
+################################################### combine into one figure ###################################################
+figure <- ggarrange(p_lws_mv, p_237_kohms, common.legend = TRUE,
+                    labels = c("LWS", "237"))
+                                        
+annotate_figure(figure,top = text_grob("Leaf Wetness Sensor values over time", 
+                   color = "black", face = "bold", size = 12))
+ggsave("c:/data/bsyse_541/lab1/combined_mv_value_time.png", width=6, height=3, dpi=1000)
+```
+
+```{r}
+# var for text size
+textsize = 6
+
+############################################# LWS SENSOR TUKEY ANOVA ##################################################
+# LWS sensor is in mV
+pruned_lws_mv <- trial_data_long %>%
+  select(trial, water_temp, time_s, mv) %>% # select only the columns of interest
+  filter(!(trial == 3 & water_temp == 21)) %>% # excluding LWS trial 3 in temp 21
+  pivot_longer(cols= c('mv'), names_to="units", values_to="values") %>%
+  mutate(water_temp = as.factor(water_temp))
+
+
+pruned_sensorspec_data <- pruned_lws_mv
+
+# perform anova and tukeys now
+anova <- aov(values ~ water_temp, data = pruned_sensorspec_data)
+summary(anova)
+
+# Tukey's test
+tukey <- TukeyHSD(anova)
+print(tukey)
+
+# # compact letter display
+cld <- multcompView::multcompLetters4(anova, tukey)
+cld <- as.data.frame.list(cld$water_temp)
+
+# Boxplot with Letters Indicating Significant Differences, https://www.youtube.com/watch?v=Pc1RVwEIT5k
+# # # table with factors and 3rd quantile
+Tk <- pruned_sensorspec_data %>% group_by(water_temp) %>%
+  summarise(mean=mean(values), quant = quantile(values, probs = 0.75)) %>%
+  arrange(desc(mean))
+
+# extract the compact letter display and add to the Tk table
+Tk$cld <- cld$Letters
+
+# boxplot
+Tk_plot1 <- ggplot(pruned_sensorspec_data, aes(water_temp, values, fill = fct_rev(water_temp))) + geom_boxplot() +
+  labs(x = "water temperature (C)", fill = "Water Temp (C)") +
+  ylab("signal (mV)") +
+  theme_bw() +
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank()) +
+  geom_text(data = Tk, aes(x = water_temp, y = quant, label=cld), vjust = -1, hjust = -1, size = textsize) +
+  # scale_fill_brewer(palette = "Blues") +
+  geom_point(aes(water_temp, values), color="darkred")
+
+Tk_plot1
+
+ggsave("c:/data/bsyse_541/lab1/lws_tukey_boxplot.png", width=6, height=3, dpi=1000)
+
+
+
+############################## CI 237 TUKEY ANOVA TESTS ###############################################
+pruned_237_kohms <- trial_data_long %>%
+  select(trial, water_temp, time_s, kohms) %>%
+  filter(!(trial == 2 & water_temp == 11)) %>% # excluding 237/11C/Trial2
+  pivot_longer(cols= c('kohms'), names_to="units", values_to="values") %>%
+  mutate(water_temp = as.factor(water_temp))
+
+pruned_sensorspec_data <- pruned_237_kohms
+# perform anova and tukeys now
+anova <- aov(values ~ water_temp, data = pruned_sensorspec_data)
+summary(anova)
+
+# Tukey's test
+tukey <- TukeyHSD(anova)
+print(tukey)
+
+# compact letter display
+cld <- multcompView::multcompLetters4(anova, tukey)
+cld <- as.data.frame.list(cld$water_temp)
+
+# Boxplot with Letters Indicating Significant Differences, https://www.youtube.com/watch?v=Pc1RVwEIT5k
+# table with factors and 3rd quantile
+Tk <- pruned_sensorspec_data %>% group_by(water_temp) %>%
+  summarise(mean=mean(values), quant = quantile(values, probs = 0.75)) %>%
+  arrange(desc(mean))
+
+# extract the compact letter display and add to the Tk table
+Tk$cld <- cld$Letters
+
+# boxplot
+Tk_plot3 <- ggplot(pruned_sensorspec_data, aes(water_temp, values, fill = fct_rev(water_temp))) + geom_boxplot() +
+  labs(x = "water temperature (C)", y="signal (kiloohms)", fill = "Water Temp (C)") +
+  theme_bw() +
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank()) +
+  geom_text(data = Tk, aes(x = water_temp, y = quant, label=cld), vjust = 1.5, hjust = -1, size = textsize) +
+  # scale_fill_brewer(palette = "Blues") +
+  geom_point(aes(water_temp, values), color="darkred")
+
+# save plot
+ggsave("c:/data/bsyse_541/lab1/237_tukey_boxplot.png", width=6, height=3, dpi=1000)
+
+
+############################################### combined figure for report ############################################
+figure <- ggarrange(Tk_plot1, Tk_plot3, common.legend = TRUE,
+                    labels = c("LWS", "237"))
+                                        
+annotate_figure(figure,top = text_grob("Mean signal values for each water temperature and sensor", 
+                   color = "black", face = "bold", size = 12))
+ggsave("c:/data/bsyse_541/lab1/combined_tukey_boxplot_values.png", dpi=1000)
+
+```
+
+
+# 2. Which sensor was more sensitive?
+A sensor's sensitivity is defined as a change in output over a change in input. Output is in mV or kiloohms, depending on sensor, input is in time?
+
+```{r}
+# change in output over time should give an idea of sensistivity as the sensors are drying over time
+sens_237 <- pruned_237_kohms %>%
+  filter(time_s == 0 | time_s == 300) %>% 
+  group_by(water_temp, time_s) %>%
+  summarize(mean = mean(values))
+
+s_237 <- c()
+s_lws <- c()
+water_temp <- c(11, 21, 32)
+
+s_237[1] <- ((sens_237$mean[2] - sens_237$mean[1]) / 300) * 60 #change in output over time, in kiloohm / minute
+s_237[2] <- ((sens_237$mean[4] - sens_237$mean[3]) / 300) * 60
+s_237[3]  <-((sens_237$mean[6] - sens_237$mean[5]) / 300) * 60
+
+sens_lws <- pruned_lws_mv %>%
+  filter(time_s == 0 | time_s == 300) %>% 
+  group_by(water_temp, time_s) %>%
+  summarize(mean = mean(values))
+
+s_lws[1] <- ((sens_lws$mean[2] - sens_lws$mean[1]) / 300) * 60 #change in output over time, in mV / minute
+s_lws[2] <- ((sens_lws$mean[4] - sens_lws$mean[3]) / 300) * 60 #change in output over time, in mV / minute
+s_lws[3]  <- ((sens_lws$mean[6] - sens_lws$mean[5]) / 300) * 60 #change in output over time, in mV / minute
+
+sens_df <- tibble(water_temp, s_lws, s_237) %>%
+  pivot_longer(cols = c('s_lws', 's_237'), names_to = 'sensor', values_to = 'sensitivity') %>%
+  mutate(water_temp = as.factor(water_temp))
+
+#plot
+sens_plot_lws <- sens_df %>%
+  filter(sensor == 's_lws') %>%
+  ggplot(aes(x=sensor, y=sensitivity, color=fct_rev(water_temp))) +
+  labs(color = "water temperature", y="sensitivity (mV/minute)") +
+  geom_point()
+
+sens_plot_237 <- sens_df %>%
+  filter(sensor == 's_237') %>%
+  ggplot(aes(x=sensor, y=sensitivity, color=fct_rev(water_temp))) +
+  labs(color = "water temperature", y="sensitivity (kiloohm/minute)") +
+  geom_point()
+
+
+############################################### combined figure for report ############################################
+figure <- ggarrange(sens_plot_lws, sens_plot_237, common.legend = TRUE,
+                    labels = c("LWS", "237"))
+                                        
+annotate_figure(figure,top = text_grob("Sensitivity of sensors at different water temperatures", 
+                   color = "black", face = "bold", size = 12))
+ggsave("c:/data/bsyse_541/lab1/combined_sens.png", dpi=1000)
+
+
+
+
+```
+
+
+```{r}
+# 3. Are the sensor readings correlated?
+# LWS sensor is in mV
+
+res1 <- cor.test(trial_data_long$kohms, trial_data_long$mv, conf.level = 0.95)
+res1
+```
+
+```{r}
+# ci_237_11 <- mean_237 %>%
+#   filter(water_temp == 11)
+# ci_237_21 <- mean_237 %>%
+#   filter(water_temp == 21)
+# ci_237_32 <- mean_237 %>%
+#   filter(water_temp == 32)
+# 
+# ci_lws_11 <- mean_lws %>%
+#   filter(water_temp == 11)
+# ci_lws_21 <- mean_lws %>%
+#   filter(water_temp == 21)
+# ci_lws_32 <- mean_lws %>%
+#   filter(water_temp == 32)
+# 
+# corr_data <- tibble(ci_237_11$mean, ci_237_21$mean, ci_237_32$mean, ci_lws_11$mean, ci_lws_21$mean, ci_lws_32$mean)
+
+mean_lws <- pruned_lws_mv %>%
+  group_by(time_s) %>%
+  summarize(mean = mean(values))
+
+mean_237 <- pruned_237_kohms %>%
+  group_by(time_s) %>%
+  summarize(mean = mean(values))
+
+corr_data <- tibble(mean_lws$mean, mean_237$mean)
+names(corr_data) <- c("mean_lws", "mean_237")
+
+
+M <- cor(corr_data, method = c("pearson"))
+M
+# colnames(M) <- c("237/11", "237/21", "237/32", "LWS/11", "LWS/21", "LWS/32")
+# rownames(M) <- c("237 @ 11C", "237 @ 21C", "237 @ 32C", "LWS @ 11C", "LWS @ 21C", "LWS @ 32C")
+
+
+corplot <- corrplot::corrplot(M, method="number", type="lower")
+
+
+res1 <- cor.test(corr_data$mean_lws, corr_data$mean_237, conf.level = 0.95)
+res1
+# corrplot::corrplot(M, addCoef.col = "grey")
+
+# corrplot::corrplot(M, add = TRUE, type = "lower", method = "ellipse", order = "AOE",
+#          diag = FALSE, tl.pos = "n", cl.pos = "n")
+# corrplot::corrplot(M, method = "number")
+
+#
+# cor(trial_data_long$mv, trial_data_long$kohms, method = c("pearson"))
+# res1 <- corrplot::cor.mtest(corr_data, conf.level = 0.95)
+# res1
+```
+
+```{r}
+
+# plot
+corr_data <- tibble(pruned_lws_mv$values, pruned_237_kohms$values)
+names(corr_data) <- c("ci_lws", "ci_237")
+
+M <- cor(corr_data, method = c("pearson"))
+M
+# corrplot::corrplot(M, method="number")
+# # corrplot::corrplot(M, add = TRUE, type = "lower", method = "ellipse", order = "AOE",
+# #          diag = FALSE, tl.pos = "n", cl.pos = "n")
+# # corrplot::corrplot(M, method = "number")
+# # corrplot::corrplot(M, addCoef.col = "grey")
+# # 
+# # cor(trial_data_long$mv, trial_data_long$kohms, method = c("pearson"))
+# res1 <- corrplot::cor.mtest(corr_data, conf.level = 0.95)
+# res1
+
+```
+
+
+```{r}
+# 4. With current program compilied and loaded on data logger, identify (provide screen snapshot) for how long one can collect the data on CR310 before it gets overwritten?
+
+
+
+```
+

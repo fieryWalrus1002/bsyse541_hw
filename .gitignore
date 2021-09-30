@@ -5,6 +5,11 @@
 # Session Data files
 .RData
 
+# renv files
+*/renv/
+/renv/
+
+
 # User-specific files
 .Ruserdata
 
@@ -37,3 +42,13 @@ vignettes/*.pdf
 
 # R Environment Variables
 .Renviron
+
+# pkgdown site
+docs/
+
+# translation temp files
+po/*~
+
+# no images or pdfs
+*.png
+*.pdf

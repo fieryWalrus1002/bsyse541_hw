@@ -1,0 +1,167 @@
+---
+title: "Lab 2"
+author: "Magnus Wood"
+date: "September 20, 2021"
+output:
+  word_document:
+    reference_docx: word-template.docx
+  html_document:
+    df_print: paged
+always_allow_html: yes
+---
+
+```{r}
+# Rmarkdown to docx instructions
+# https://rmarkdown.rstudio.com/articles_docx.html
+# https://bookdown.org/yihui/rmarkdown/word-document.html
+
+# R-Markdown: The Definitive Guide
+# https://bookdown.org/yihui/rmarkdown/
+```
+
+
+```{r, echo=FALSE, warning=FALSE}
+# install.packages("pacman")
+pacman::p_load(tidyverse, ggpubr, corrplot, DiagrammeR, rsvg, DiagrammeRsvg, png, webshot)
+#webshot::install_phantomjs()
+
+```
+
+9-15-21 Data collection in field
+Setup at organic farm at 11:54am. Site chosen near apple trees. 
+
+Station 2, .1L / 30m. 12:05pm, 12:35pm, 1:05pm applications
+Station 3, .5L / 30m. 12:00pm, 12:30pm, 1:00pm applications
+
+```{r}
+df_names <- c("TIMESTAMP", "RECORD", "BattV_Avg", "PTemp_C_Avg", "VWC_Avg", "EC_Avg", "T_Avg", "P_Avg", "PA_Avg", "VR_Avg", "station", "water_L")
+
+# Station 2, .1L / 30m. 12:05pm, 12:35pm, 1:05pm applications
+# was cleared before collection
+station2_df <- read_csv("Lab2_data/CR300Series_2_Table1 - Copy.dat", skip=6, col_names=FALSE) %>%
+  mutate(station = 2, water_L = .1)
+
+# Station 3, .5L / 30m. 12:00pm, 12:30pm, 1:00pm applications
+# station 3 had data from previous runs on it, needs to be filtered out
+station3_df <-read_csv("Lab2_data/CR300Series_3_Table1 - Copy.dat", skip=610, col_names=FALSE) %>%
+  mutate(station = 3, water_L = .5)
+
+# names of columns
+names(station2_df) <- df_names
+names(station3_df) <- df_names
+
+# combine them
+my_df <- bind_rows(station2_df, station3_df)
+```
+Topic: Integration of CR310 Data Logger with soil sensors with data logger for experimentation and wireless data acquisition
+
+Field experiment set-up:
+* configured
+
+
+```{r echo=FALSE, out.width= '50%', out.height= '50%'}
+# Flow Chart in R using DiagrammeR package, docs: https://rich-iannone.github.io/DiagrammeR/docs.html
+
+# create a flow chart
+digraph_example = "digraph dot {
+  graph [layout = dot]
+
+  # define node aesthetics
+  node [fontname = arial, 
+        shape = oval, 
+        color = gray, 
+        style = filled, 
+        fontcolor = White, 
+        fontsize = 11]
+        
+  tab1 [label = '@@1']
+  tab2 [label = '@@2']
+  tab3 [label = '@@3']
+  tab4 [label = '@@4']
+  tab5 [label = '@@5']
+  tab6 [label = '@@6']
+  
+  # set up node layout
+  tab1 -> tab2
+  tab2 -> tab3
+  tab2 -> tab6
+  tab6 -> tab2
+  tab6 -> tab4
+  tab4 -> tab5
+  tab5 -> tab1
+  tab3 -> tab1
+  }
+  
+  # define tab labels
+  [1]: 'Learning Data Science to better fight a walrus'
+  [2]: 'fighting a walrus'
+  [3]: 'lose the fight'
+  [4]: 'laser swords run out of batteries'
+  [5]: 'go to store and get batteries'
+  [6]: 'win a laser sword as loot'
+  
+"
+# working to fix output into word with this workaround: https://github.com/rich-iannone/DiagrammeR/issues/133
+diagram_example <- grViz(digraph_example)
+diagram_example
+# tmp<-capture.output(rsvg_png(charToRaw(export_svg(diagram_example)),'diagram_example.png'))
+# cat('![example flowchart](diagram_example.png){#fig:An example of a flowchart created with DiagrammeR}\n\n')
+# 
+# # Create a PNG of this graph
+export_svg(grViz(digraph_example)) %>%
+  charToRaw %>% rsvg %>% png::writePNG('graph.png')
+# # cat("!['graph.png test']('graph.png')")
+```
+
+## Including External Graphic
+```{r pressure, echo=FALSE, fig.cap="A caption", out.width = '50%'}
+# knitr::include_graphics("graph.png")
+```
+
+
+
+```{r}
+# DiagrammeR mermaid graph
+
+mermaid("
+graph LR
+  A(Learning Data Science to better fight a walrus)-->B
+  A-->C[lose the fight]
+  C-->A
+  C-->E(taco break)
+  B[fighting a walrus]-->D{laser swords run out of batteries}
+  C-->D(go to store and get batteries)
+  D-->F
+  E-->F{win a laser sword as loot}
+")
+
+```
+
+
+```{r}
+# Sequence Diagrams, as seen in "How to Draw Sequence Diagrams" report by Poranen, Makinen, and Nummenmaa 
+# offers a good introduction to sequence diagrams. 
+#Let's replicate the ticket-buying example from Figure 1 of this report and add in some conditionals.
+
+mermaid("
+        sequenceDiagram
+          customer->>ticket seller: ask ticket
+          ticket seller->>database: seats
+          alt tickets available
+            database->>ticket seller: ok
+            ticket seller->>customer: confirm
+            customer->>ticket seller: ok
+            ticket seller->>database: book a seat
+            ticket seller->>printer: print ticket
+          else sold out
+            database->>ticket seller: none left
+            ticket seller->>customer: sorry
+          end
+        ")
+
+# saveNetwork(g, "g.html")
+# webshot("g.html", "g.png", vheight = 50)
+```
+
+
+
