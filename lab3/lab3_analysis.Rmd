@@ -41,13 +41,6 @@ pacman::p_load(tidyverse, ggpubr, corrplot, DiagrammeR, rsvg, DiagrammeRsvg, png
 # Load the data files
 # Station 2, .5L / 30m. 12:00pm, 12:30pm, 1:00pm applications
 # was cleared before collection
-station2_df <- read_csv("Lab2_data/CR300Series_2_Table1 - Copy.dat", skip=4, col_names=FALSE, show_col_types = FALSE) %>%
-  mutate(station = 2, water_L = .5) 
-
-# Station 3, .1L / 30m. 12:05pm, 12:35pm, 1:05pm applications
-# station 3 had data from previous runs on it, needs to be filtered out
-station3_df <-read_csv("Lab2_data/CR300Series_3_Table1 - Copy.dat", skip=608, col_names=FALSE, show_col_types = FALSE) %>%
-  mutate(station = 3, water_L = .1)
 
 # names of columns
 df_names <- c("TIMESTAMP", "RECORD", "BattV_Avg", "PTemp_C_Avg", "VWC_Avg", "EC_Avg", "T_Avg", "P_Avg", "PA_Avg", "VR_Avg", "station", "water_L")
