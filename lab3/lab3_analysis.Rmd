@@ -1,0 +1,313 @@
+---
+title: "Lab 3"
+author: "Magnus Wood"
+date: "October 3rd, 2021"
+output:
+  word_document:h
+    reference_docx: word-template.docx
+  html_document:
+    df_print: paged
+always_allow_html: yes
+---
+
+# Introduction
+
+Topic: 
+Field experiment set-up:
+* configured
+
+```{r r-markdown_references, echo=FALSE, warning=FALSE}
+# Rmarkdown to docx instructions
+# https://rmarkdown.rstudio.com/articles_docx.html
+# https://bookdown.org/yihui/rmarkdown/word-document.html
+
+# R-Markdown: The Definitive Guide
+# https://bookdown.org/yihui/rmarkdown/
+```
+
+
+```{r install_packages, echo=FALSE, warning=FALSE}
+# install.packages("pacman")
+pacman::p_load(tidyverse, ggpubr, corrplot, DiagrammeR, rsvg, DiagrammeRsvg, png, webshot, bookdown, multcompView)
+#webshot::install_phantomjs()
+
+```
+
+
+
+```{r load_data, echo=FALSE, warning=FALSE}
+
+
+# Load the data files
+# Station 2, .5L / 30m. 12:00pm, 12:30pm, 1:00pm applications
+# was cleared before collection
+station2_df <- read_csv("Lab2_data/CR300Series_2_Table1 - Copy.dat", skip=4, col_names=FALSE, show_col_types = FALSE) %>%
+  mutate(station = 2, water_L = .5) 
+
+# Station 3, .1L / 30m. 12:05pm, 12:35pm, 1:05pm applications
+# station 3 had data from previous runs on it, needs to be filtered out
+station3_df <-read_csv("Lab2_data/CR300Series_3_Table1 - Copy.dat", skip=608, col_names=FALSE, show_col_types = FALSE) %>%
+  mutate(station = 3, water_L = .1)
+
+# names of columns
+df_names <- c("TIMESTAMP", "RECORD", "BattV_Avg", "PTemp_C_Avg", "VWC_Avg", "EC_Avg", "T_Avg", "P_Avg", "PA_Avg", "VR_Avg", "station", "water_L")
+names(station2_df) <- df_names
+names(station3_df) <- df_names
+
+# variables we will carry into our data analysis
+
+
+# combine them into a dataframe that we can use
+my_df <- bind_rows(station2_df, station3_df) %>%
+  separate(TIMESTAMP, into = c("date", "time"), sep = " ") %>%
+  separate(time, into = c("hours", "minutes", NA), sep=":") %>%
+  mutate(time_m = (as.numeric(hours) - 12) * 60 + as.numeric(minutes)) %>%
+  mutate(station = as.factor(station), water_L = as.factor(water_L)) %>%
+  select(time_m, station, water_L, VWC_Avg, EC_Avg, T_Avg) %>%
+  mutate(time_m = ifelse(station == 3, time_m, time_m)) %>%
+  filter(time_m <= 90)
+# %>%
+#   filter(time_m >= 0)
+```
+# Methods and Experimental Design
+
+The components of the measurement system were connected and tested in the following manner. First, the RF407 base station radio was connected to the laptop and setup according to provided instructions using the LoggerNet software (Campbell Scientific, Logan, UT, USA). Each CR310 datalogger was then connected to the laptop and programmed with a separate PakBus address. After disconnecting the datalogger from the laptop, communication between the base station and the datalogger was confirmed. The CS655 water content reflectometer sensors were connected to the datalogger according to the wiring diagram instructions, and tested using hand, soil and water in a lab setting to ensure the datalogger was correctly logging values from the sensor. The final device setup is show in Figure 1. 
+
+```{r Fig1_device-diagram, echo=FALSE, fig.cap="Figure 1. Device Diagram showing connections between dataloggers and sensors"}
+# DiagrammeR 
+mermaid("
+graph LR
+  A[laptop]---B[RF407]
+  B---|wireless|C[CR310]
+  B---|wireless|D[CR310]
+  C---G[12V Battery]
+  C---E(CS650)
+  D---F(CS650)
+  D---H[12V Battery]
+  
+")
+
+```
+
+```{r Fig2_location_figure, echo=FALSE, fig.asp=.5, fig.cap='Figure 2. Field Location: Eggert Family Organic Farm, Animal Sciences Rd, Pullman, WA 99163.'}
+
+knitr::include_graphics("Lab2_data/location.png")
+```
+
+The device components were transported to the experiment location at Eggert Family Organic Farm (Animal Sciences Rd, Pullman, WA, USA), shown in Figure 2. The experimental location was set up and data was collected on Sep. 15, 2021 for ninety minutes starting at 12:00 PM. Each soil sensor was placed within 30cm of a different apple tree, with the base station placed between the two stations as seen in Figure 3.  
+
+```{r Fig3_experimental_setup_figure, echo=FALSE, fig.asp=.5, fig.cap='Figure 3. Field setup. Base station with laptop and RF407 at 1, CR310 datalogger and CS-650 soil moisture sensors at 2 and 3'}
+
+knitr::include_graphics("Lab2_data/setup_corrected.png")
+```
+
+Water was acquired from a nearby farm sink, and kept in a bucket near the base station.The experiment involved three applications of water applied near the sensors, with water volume varying by station, as seen in Figure 4. Data was collected by the dataloggers at intervals of 5 minutes. Station 2 was given .5 L of water, poured 10cm away from the soil sensor, beginning at 12:00 PM and repeated twice at 12:30 PM and 1:00 PM. Station 3 was given .1 L of water at 12:05 PM, and .1 L at both 12:35 PM and 1:05 PM. 
+
+```{r Fig4_experimental-design-chart, echo=FALSE, fig.cap="Figure 4. Experiment Flow Diagram"}
+# DiagrammeR 
+mermaid("
+graph TD
+  A[Lab evaluation and setup]-->B[Field Experiment setup]
+  B-->|Station 2|C[.1L, every 30 minutes, 3 reps]
+  B-->|Station 3|D[.5L, every 30 minutes, 3 reps]
+  D-->|every 5m|E[wireless data aquisition by base radio]
+  C-->|every 5m|E
+  E-->F[data downloaded to laptop]
+")
+
+```
+
+# Results
+
+```{r fig5_plot_raw_values, echo=FALSE, warning=FALSE, fig.asp=.7, fig.width=6, fig.cap='Figure 5. Raw probe values over time', out.width='50%'}
+
+#VWC_Avg, EC_Avg, T_Avg)
+plot_VWC <- my_df %>%
+  ggplot(aes(x=time_m, y=VWC_Avg, color=factor(water_L))) +
+  theme_bw() +
+  geom_line() +
+  
+  # facet_wrap(~water_L) +
+  ylab("VWC (m³/³)") +
+  xlab("time (minutes)") +
+  labs(color = "water (L)") + 
+  scale_x_continuous(name ="time (m)", breaks = c(0, 30, 60, 90), limits = c(-10, 95)) +
+  theme(axis.line = element_line(colour = "black"),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    panel.border = element_blank(),
+    panel.background = element_blank()) 
+
+#VWC_Avg, EC_Avg, T_Avg)
+plot_EC <- my_df %>%
+  ggplot(aes(x=time_m, y=EC_Avg, color=factor(water_L))) +
+  theme_bw() +
+  geom_line() +
+  # facet_wrap(~water_L) +
+  ylab("EC (dS/m)") +
+  xlab("time (minutes)") +
+  labs(color = "water (L)") + 
+  scale_x_continuous(name ="time (m)", breaks = c(0, 30, 60, 90), limits = c(-5, 95)) +
+  theme(axis.line = element_line(colour = "black"),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    panel.border = element_blank(),
+    panel.background = element_blank())
+
+#VWC_Avg, EC_Avg, T_Avg)
+plot_T <- my_df %>%
+  ggplot(aes(x=time_m, y=T_Avg, color=factor(water_L))) +
+  theme_bw() +
+  geom_line() +
+  # facet_wrap(~water_L) +
+  ylab("soil temperature (°C)") +
+  xlab("time (minutes)") +
+  labs(color = "water (L)") + 
+  coord_cartesian(ylim=c(20, 30)) +
+  scale_x_continuous(name ="time (m)", breaks = c(0, 30, 60, 90), limits = c(-5, 95)) +
+  theme(axis.line = element_line(colour = "black"),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    panel.border = element_blank(),
+    panel.background = element_blank())
+
+# combine into a figure
+figure <- ggarrange(plot_VWC, plot_EC, plot_T, common.legend = TRUE, nrow = 1)
+                                        
+annotate_figure(figure,top = text_grob("Probe values over time", 
+                   color = "black", face = "bold", size = 12))
+```
+
+Raw values for the sensors are shown in Figure 5. Volumentric Water Content (VWC) increased rapidly immediately following the applications of water, then fell off until the next application. Bulk electrical conductivity (EC) followed a similar pattern. Soil temperature, measured in °C, exhibited a different pattern. At Station 2 (0.1L treatment), soil temperature fell for the first measurement period, rose for the second, then declined for the third. Station 3 (0.5 L treatment) showed steady values for mostly level values for the first period, then rose for the second and fell for the third time period. 
+
+Air temperature at the field site was 20 °C. 
+
+```{r anova_treatment_diff, echo=FALSE, warning=FALSE, include=FALSE}
+# perform anova and tukeys now
+my_df2 <- my_df %>%
+  mutate(period = ifelse(time_m > 30, 2, 1)) %>%
+  mutate(period = ifelse(time_m > 60, 3, period)) %>%
+  mutate(period = as.factor(period)) %>%
+  mutate(water_L = as.factor(water_L)) %>%
+  group_by(period, water_L)
+
+anova1 <- aov(my_df2$VWC_Avg ~ my_df2$water_L + my_df2$period)
+summary(anova1)
+
+anova2 <- aov(my_df2$EC_Avg ~ my_df2$water_L + my_df2$period)
+summary(anova2)
+
+anova3 <- aov(my_df2$T_Avg ~ my_df2$water_L + my_df2$period)
+summary(anova3)
+
+
+
+```
+
+
+```{r fig6_plot_mean_values, echo=FALSE, warning=FALSE, fig.asp=.7, fig.width=6, fig.cap='Figure 6. Mean values and standard deviation for each time period', out.width='50%'}
+
+# mean values
+
+  
+my_df2 <- my_df %>%
+  mutate(period = ifelse(time_m > 30, 2, 1)) %>%
+  mutate(period = ifelse(time_m > 60, 3, period)) %>%
+  mutate(period = as.factor(period)) %>%
+  mutate(water_L = as.factor(water_L)) %>%
+  group_by(period, water_L)
+
+mean_df <- my_df2 %>%
+  group_by(water_L, period) %>%
+  summarize(mean_vwc=mean(VWC_Avg),
+            sd_vwc=sd(VWC_Avg),
+            mean_ec = mean(EC_Avg),
+            sd_ec = sd(EC_Avg),
+            mean_temp = mean(T_Avg),
+            sd_temp = sd(T_Avg))
+
+
+################## vwc
+
+plot_mean_VWC <- ggplot(mean_df, aes(x=period, y=mean_vwc, fill=water_L)) +
+  geom_bar(stat="identity", color="black",
+           position=position_dodge()) +
+  geom_errorbar(aes(ymin=mean_vwc-sd_vwc, ymax=mean_vwc+sd_vwc), width=.2,
+                 position=position_dodge(.9)) +
+  theme_bw() +
+  ylab("mean period VWC (m³/³)") +
+  xlab("treatment period") +
+  labs(color = "water (L)") +
+  theme(axis.line = element_line(colour = "black"),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    panel.border = element_blank(),
+    panel.background = element_blank())
+
+############# ec
+
+
+plot_mean_EC <- ggplot(mean_df, aes(x=period, y=mean_ec, fill=water_L)) +
+  geom_bar(stat="identity", color="black",
+           position=position_dodge()) +
+  geom_errorbar(aes(ymin=mean_ec-sd_ec, ymax=mean_ec+sd_ec), width=.2,
+                 position=position_dodge(.9)) +
+  theme_bw() +
+  ylab("mean period EC (dS/m)") +
+  xlab("treatment period") +
+  labs(color = "water (L)") +
+  theme(axis.line = element_line(colour = "black"),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    panel.border = element_blank(),
+    panel.background = element_blank())
+
+
+############## temp
+
+plot_mean_T <- ggplot(mean_df, aes(x=period, y=mean_temp, fill=water_L)) +
+  geom_bar(stat="identity", color="black",
+           position=position_dodge()) +
+  geom_errorbar(aes(ymin=mean_temp-sd_temp, ymax=mean_temp+sd_temp), width=.2,
+                 position=position_dodge(.9)) +
+  theme_bw() +
+  ylab("mean period soil temperature (°C)") +
+  xlab("treatment period") +
+  labs(color = "water (L)") +
+  theme(axis.line = element_line(colour = "black"),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    panel.border = element_blank(),
+    panel.background = element_blank())
+
+
+
+# combine into a figure
+figure <- ggarrange(plot_mean_VWC, plot_mean_EC, plot_mean_T, common.legend = TRUE, nrow = 1)
+                                        
+annotate_figure(figure,top = text_grob("Mean values for each 30m period", 
+                   color = "black", face = "bold", size = 12))
+
+
+```
+
+# Data Analysis and Conclusions
+
+VWC and EC data showed an immediate increase following the water treatment. After each treatment, the values decreased in an exponential decay that ended roughly in line with the previous period's peak. This indicates that the rate of soil drainage is much slower than the rate of water application. A one-way ANOVA was conducted to compare the measured values by period and water treatment levels. There was not a significant difference in VWC by water treatment (p = 0.106), but values were significantly different for each period (p < 0.001). 
+
+EC values were significantly different across both water treatment (p < 0.001) and period (p < 0.001). Soil temperature was also significantly different across both water treatment (p < 0.001) and period (p < 0.001).
+
+Soil temperature values were not consistent with any single factor and did not change consistently over time or between water treatment levels. It is likely that the probes were not given enough time to reach the soil temperature before treatments began. The water for treatments was kept in a bucket above ground in direct sunlight, although the field site was breezy and only 20°C. 
+
+All of these factors are highly dependent on site-specific variables such as cloud coverage, canopy shade, air temperature, recent rainfall, soil drainage, and slope of the field site. 
+
+# References
+
+[1] "CS-655 Water Content Reflectometers." Campbell Scientific, Feb. 2018. [Online].
+Available: https://s.campbellsci.com/documents/es/manuals/cs650.pdf
+
+[2] "CR300 Series Compact Datalogger." Campbell Scientific, Jul. 2021. [Online]. 
+Available: https://s.campbellsci.com/documents/us/manuals/cr300.pdf
+
+[3] "RF407-Series Spread Spectrum Radios." Campbell Scientific, Dec. 2019 [Online].
+Available: https://s.campbellsci.com/documents/us/manuals/rf407-series.pdf
