@@ -1,0 +1,61 @@
+9/27/2021
+15:57:30
+Created by Short Cut (4.4)
+Short Cut Program:  lab3.DEF
+
+-Wiring for CR300/CR310-
+
+  SDI-12
+    BAT +:  Power
+    G:  Ground
+    G:  Shield
+    C1:  Data Line
+
+-Measurement Labels-
+
+  Default
+    BattV
+    PTemp_C
+
+  SDI-12
+    Res1
+    Res2
+    Res3
+    Res4
+    Res5
+    Res6
+    Res7
+    Res8
+    Res9
+
+----------------------------------------------------
+Table: Table2
+Interval: 1440 MIN
+Fields:
+ BattV_Min	Units: Volts
+
+----------------------------------------------------
+Table: DataTableInfo
+Fields:
+ DataTableName(1)
+ SkippedRecord
+ DataRecordSize	Units: records
+ SecsPerRecord
+ DataFillDays	Units: days
+ DataFilled(1,1)
+
+----------------------------------------------------
+Table: Public
+Fields:
+ BattV	Units: Volts
+ PTemp_C	Units: Deg C
+ Res1	Units: unit
+ Res2	Units: unit
+ Res3	Units: unit
+ Res4	Units: unit
+ Res5	Units: unit
+ Res6	Units: unit
+ Res7	Units: unit
+ Res8	Units: unit
+ Res9	Units: unit
+
