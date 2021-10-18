@@ -49,6 +49,8 @@ docs/
 # translation temp files
 po/*~
 
-# no images or pdfs
+# images and documents
 *.png
 *.pdf
+*.docx
+*.jpg
