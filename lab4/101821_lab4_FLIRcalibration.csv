@@ -1,0 +1,15 @@
+temp_C and temp_F are black body setting,,,,
+cycle_1 and cycle_2 are readings taken from FLIR software,,,,
+,,,,
+direction,temp_C,temp_F,cycle_1,cycle_2
+up,15.0,59.0,17.2,16.3
+up,20.0,68.0,21.9,21.0
+up,25.0,77.0,26.7,25.7
+up,30.0,86.0,30.6,30.4
+up,35.0,95.0,35.2,35.1
+up,40.0,104.0,39.9,39.8
+down,35.0,95.0,35.1,35.1
+down,30.0,86.0,30.3,30.3
+down,25.0,77.0,25.5,25.6
+down,20.0,68.0,20.9,20.9
+down,15.0,59.0,16.3,16.3
