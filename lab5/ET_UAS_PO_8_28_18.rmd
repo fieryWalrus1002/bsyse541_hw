@@ -1,0 +1,150 @@
+---
+title: "R Notebook"
+output:
+  html_document:
+    df_print: paged
+---
+
+## ---- message=FALSE------------------------------------------------------
+#setwd("D:/ET_Hands_On")
+
+```{r}
+library(raster)
+library(rgdal)
+library(ETUAS)
+```
+
+```{r import raster and display}
+R <- raster("RETAU2_PO_08282018_50_B6.tif")
+plot(R)
+```
+
+```{r create area of interest}
+
+aoi <- createAoi(topleft = c(344200, 5184000), bottomright = c(344270, 5183880), EPSG = 32611)
+r <- crop(R,aoi)
+
+```
+
+
+## ------------------------------------------------------------------------
+
+```{r import data files for weather}
+
+csvfile <- "Othello_8_28_18_weather.csv"
+MTLfile <- "08_28_18_50m_MTL.txt"
+
+```
+
+
+```{r weather data preparation and storage}
+#### elev in 'm' MSL ###
+WeatherStation <- read.WSdata(WSdata = csvfile, date.format = "%d/%m/%Y", lat= 46.03, long= -119.53, elev=269.443, height= 2.2,
+                              columns=c("date" = 1, "time" = 2, "radiation" = 3,"wind" = 4, "RH" = 6, "temp" = 7, "rain" = 8), MTL = MTLfile)
+
+```
+
+``` {r Read the imagery data}
+image.DN <-loadRawSpectra(aoi=aoi)
+plot(image.DN)
+```
+
+```{r DEM surface model}
+DEM<-prepareDEM(extent=image.DN)
+
+## ---- surface properties ##------------------------------------------------------
+surface.model <-METRICtopo(DEM)
+surface.model$Slope[is.na(surface.model$Slope[])] <- 0
+surface.model$Aspect[is.na(surface.model$Aspect[])] <- 0
+
+## solar angles ##
+solar.angles.r <- solarAngles(surface.model = surface.model,WeatherStation = WeatherStation, MTL = MTLfile)
+
+## Incoming shortwave radiation ##
+Rs.inc <- incSWradiation(surface.model = surface.model, solar.angles = solar.angles.r, WeatherStation = WeatherStation)
+plot(Rs.inc)
+#writeRaster(Rs.inc, filename="ISWR_PO_8_28_18_50m.tif", format="GTiff", overwrite=TRUE)
+
+## Surface albedo ##
+albedo <- (image.DN$B)*0.237 + (image.DN$G)*0.239 + (image.DN$R)*0.118 + (image.DN$NIR)*0.098 + (image.DN$RE)*0.306
+#plot(albedo)
+#writeRaster(albedo, filename="albedo_PO_8_28_18_50m.tif", format="GTiff", overwrite=TRUE)
+```
+
+
+```{r}
+## ---- LAI default method---- #
+LAI <- LAI(method = "metric2010", image = image.DN, L=0.1)
+plot(LAI)
+#writeRaster(LAI, filename="LAI_PO_METRIC_8_28_18_50m.tif", format="GTiff", overwrite=TRUE)
+```
+
+```{r}
+## ---- surface temperature with calibration and blackbody emissivity correction------#
+Ts <- (1.164*(image.DN$Thermal)-7.204)*((1/0.95)^0.25) +273.15
+plot(Ts)
+#writeRaster(Ts, filename="Ts_PO_8_28_18_50m.tif", format="GTiff", overwrite=TRUE)
+
+## Outgoing longwave radiation from surface ##
+Rl.out <- outLWradiation(LAI = LAI, Ts=Ts)
+plot(Rl.out)
+#writeRaster(Rl.out, filename="OLWR_PO_8_28_18_50m.tif", format="GTiff", overwrite=TRUE)
+
+## Incoming longwave radiation from atmosphere ##
+Rl.inc <- incLWradiation(WeatherStation,DEM = surface.model$DEM,solar.angles = solar.angles.r, Ts= Ts)
+plot(Rl.inc)
+#writeRaster(Rl.inc, filename="ILWR_PO_METRIC_8_28_18_50m.tif", format="GTiff", overwrite=TRUE)
+
+##--- Net radiation--- ##
+Rn <- netRadiation(LAI, albedo, Rs.inc, Rl.inc, Rl.out)
+plot(Rn)
+#writeRaster(Rn, filename="Rn_PO_UAS_METRIC_8_28_18_50m.tif", format="GTiff", overwrite=TRUE)
+```
+
+```{r}
+
+```
+```{r}
+## ----Soil Heat Flux ---- ##
+G <- soilHeatFlux(image = image.DN, Ts=Ts,albedo=albedo,Rn=Rn, LAI=LAI)
+plot(G)
+#writeRaster(G, filename="G_PO_UAS_METRIC_8_28_18_50m.tif", format="GTiff", overwrite=TRUE)
+```
+```{r}
+?momentumRoughnessLength
+```
+
+
+```{r}
+## ----Momentum roughness length ----- ##
+Z.om <- momentumRoughnessLength(LAI=LAI, mountainous = TRUE, method = "short.crops",surface.model = surface.model)
+plot(Z.om)
+#writeRaster(Z.om, filename="Zom_PO_UAS_METRIC_8_28_18_50m.tif", format="GTiff", overwrite=TRUE)
+```
+
+```{r}
+## Hot and cold Anchor pixels ##
+hot.and.cold <- calcAnchors(image = image.DN, Ts = Ts, LAI = LAI, plots = F,albedo = albedo, Z.om = Z.om, n = 5, anchors.method = "flexible", deltaTemp = 5, verbose = FALSE)
+```
+
+```{r}
+#write.csv(hot.and.cold, file = "Anchors_PO_UAS_METRIC_8_28_18_50m.csv")
+
+
+## Sensible heat flux ##
+H <- calcH(anchors = hot.and.cold, Ts = Ts, Z.om = Z.om, WeatherStation = WeatherStation, ETp.coef = 1.05, Z.om.ws = 0.03, DEM = DEM, Rn = Rn, G = G, verbose = FALSE)
+plot(H$H)
+#writeRaster(H$H, filename="H_PO_UAS_METRIC_8_28_18_50m.tif", format="GTiff", overwrite=TRUE)
+#plot(H$dT)
+#writeRaster(H$dT, filename="dT_PO_UAS_METRIC_8_28_18_50m.tif", format="GTiff", overwrite=TRUE)
+```
+
+
+```{r}
+## Reference ET for alfalfa crop##
+ET_WS <- dailyET(WeatherStation = WeatherStation, MTL = MTLfile)
+
+## Daily ET, METRIC based ##
+ET.24 <- ET24h(Rn, G, H$H, Ts, WeatherStation = WeatherStation, ETr.daily=ET_WS)
+#writeRaster(ET.24, filename="Daily_ET_PO_UAS_METRIC_8_28_18_50m.tif", format="GTiff", overwrite=TRUE)
+```

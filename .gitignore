@@ -3,6 +3,11 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+# nasty software
+lab5/Literature
+lab5/Software_Packages
+
+
 # History files
 .Rhistory
 .Rapp.history
@@ -205,3 +210,4 @@ po/*~
 *.pdf
 *.docx
 *.jpg
+*.tif
