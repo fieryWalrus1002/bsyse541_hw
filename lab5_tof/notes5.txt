@@ -1,0 +1,9 @@
+The data from sensor can be used or other software can be used for analysis.
+5. The project report should include the following discussion:
+a. Is the accuracy of the measurements consistent across multiple working distance? Discuss the
+findings from the data.
+b. Is there a difference in accuracy of the measurements with respect to object type? Discuss the
+findings from the data.
+c. Theoretically, does light conditions affect the accuracy of the sensor measurements? Based on
+the conducted experiment, did you observe effect of the light conditions on the data accuracy?
+Discuss the findings from the data.
