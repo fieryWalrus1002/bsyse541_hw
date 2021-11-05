@@ -36,7 +36,9 @@ class PlotCoordinates:
         plot_shape: tuple[tuple, tuple],
         roi_shape: tuple[int, int],
     ) -> list:
-        """creates pyplot figure with plot boundaries for visual verification"""
+        """creates pyplot figure with plot boundaries for visual verification
+           roi_coords is Y, X
+        """
 
         plot_id_list = []
         figure, ax = plt.subplots(1, figsize=(6, 20))
@@ -48,12 +50,12 @@ class PlotCoordinates:
             zip(plot_coords, roi_coords)
         ):
 
-            roi_x, roi_y = roi_coord
+            roi_y, roi_x = roi_coord
 
             plot_boundary = patches.Rectangle(
-                xy=plot_coord,
-                width=plot_shape[0],
-                height=plot_shape[1],
+                xy=(plot_coord[1], plot_coord[0]),
+                width=plot_shape[1],
+                height=plot_shape[0],
                 edgecolor="r",
                 lw=2,
                 facecolor="r",
@@ -62,9 +64,9 @@ class PlotCoordinates:
             ax.add_patch(plot_boundary)
 
             plot_subsection = patches.Rectangle(
-                xy=roi_coord,
-                width=roi_shape[0],
-                height=roi_shape[1],
+                xy=(roi_coord[1], roi_coord[0]),
+                width=roi_shape[1],
+                height=roi_shape[0],
                 edgecolor="None",
                 facecolor="green",
                 alpha=0.4,
@@ -72,15 +74,12 @@ class PlotCoordinates:
             ax.add_patch(plot_subsection)
 
             plt.scatter(
-                x=roi_x,
-                y=roi_y,
-                c="red",
-                marker="o",
+                x=roi_x, y=roi_y, c="red", marker="o",
             )
 
             ax.text(
-                x=roi_x + 0.27 * roi_shape[0],
-                y=roi_y + 0.5 * roi_shape[1],
+                x=roi_x + 0.27 * roi_shape[1],
+                y=roi_y + 0.5 * roi_shape[0],
                 s=plot_id,
                 c="magenta",
             )

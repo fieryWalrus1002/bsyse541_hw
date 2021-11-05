@@ -8,7 +8,9 @@ import numpy.typing as npt
 
 
 class ImageProcessing:
-    def __init__(self, params):
+    def __init__(
+        self, params={"data_export_path": "", "data_import_path": "",}
+    ):
         self.params = params
         pass
 
@@ -70,8 +72,9 @@ class ImageProcessing:
         """calculates spectral index from channel nums of np.array
         NDSI = (band[0] - band[1]) / (band[0] + band[1])
         This function avoids divide by zero error."""
-        band_a = bands[combo[0]]
-        band_b = bands[combo[1]]
+        bands = bands.astype("float64")
+        band_a = bands[:, :, combo[0]]
+        band_b = bands[:, :, combo[1]]
 
         numer = np.subtract(band_a, band_b)
         denom = np.add(band_a, band_b)
@@ -87,14 +90,13 @@ class ImageProcessing:
         mask: npt.NDArray,
     ) -> float:
         """Return mean value for arr in the given region of interest.
-
-        Origin and shape are (x, y), but the np.array is (y, x).
-
+       
         Calculates mean using a boolean mask to exclude bg values.
+        Expects (Y, X)
         """
 
-        roi_width, roi_height = shape
-        roi_x, roi_y = origin
+        roi_height, roi_width = shape
+        roi_y, roi_x = origin
 
         return np.mean(
             a=arr[roi_y : roi_y + roi_height, roi_x : roi_x + roi_width],
