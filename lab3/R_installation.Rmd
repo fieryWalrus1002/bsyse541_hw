@@ -1,0 +1,147 @@
+---
+title: "Lab 3"
+author: "Magnus Wood"
+date: "October 3rd, 2021"
+output:
+  word_document
+always_allow_html: yes
+---
+
+```{r r-markdown_references, echo=FALSE, warning=FALSE}
+# Rmarkdown to docx instructions
+# https://rmarkdown.rstudio.com/articles_docx.html
+# https://bookdown.org/yihui/rmarkdown/word-document.html
+
+# R-Markdown: The Definitive Guide
+# https://bookdown.org/yihui/rmarkdown/
+```
+
+
+```{r install_packages, echo=FALSE, warning=FALSE}
+# install.packages("pacman")
+pacman::p_load(tidyverse, ggpubr, bookdown, vtable)
+#webshot::install_phantomjs()
+
+```
+
+```{r load_data, echo=FALSE, warning=FALSE}
+# data was collected outside from 12:20 until 15:20
+lab3_df <- read_csv("lab3_b.csv", show_col_types = FALSE)
+
+
+column_names <- c("TIMESTAMP","RECORD","Solar_W/m2","AirTemp_dC","Vapor_Pressure_kPa","AtmPressure_kPa","RelHumidity","WindSpeed_m/s","WindDirection")
+
+my_df <- lab3_df %>% 
+  separate(TIMESTAMP, into = c("date", "time"), sep = " ") %>%
+  separate(time, into = c("hours", "minutes", NA), sep=":") %>%
+  mutate(time_m = (as.numeric(hours) - 12) * 60 + as.numeric(minutes) - 20) %>%
+  filter(time_m <= 180) %>%
+  select("time_m", "Solar_W/m2", "AirTemp_dC", "RelHumidity", "WindSpeed_m/s")
+
+
+names(my_df) <- c("time", "solar", "airtemp", "humidity", "windspeed")
+
+
+sec <- 0.5
+
+for (i in 1:722) {
+
+  if (sec > 0.75) {
+    sec = 0.0
+  }
+
+  my_df$time[i] <- my_df$time[i] + sec
+  sec = sec + 0.25
+}
+#   
+
+my_df <- my_df %>% select("time", "solar", "airtemp", "humidity", "windspeed")
+
+
+```
+
+## Summary Table
+```{r Table1_summary, echo=FALSE, fig.cap="Table 1. Summary statistics of ATMOS41 data"}
+#Getting complex
+
+labs <- c("time",
+    "solar radiation",
+    'air temperature',
+    'relative humidity',
+    'wind speed')
+my_df2 <- my_df %>% select("solar", "airtemp", "humidity", "windspeed")
+
+sumtbl<- sumtable(my_df2, out='return', summ = list(c('notNA(x)', 'mean(x)', 'median(x)', 'sd(x)', 'min(x)', 'max(x)')), summ.names = list(c("n", "Mean", "Median", "StdDev", "Min", "Max")))
+
+# sumtbl <- sumtable(my_df2,labels=labs, out='return', col.breaks = 3,
+#    summ = list(c('notNA(x)','mean(x)','median(x)', 'sd(x)','min(x)','max(x)')
+#    ),
+#    summ.names = list(c('N','Mean','Median','SD','Min','Max')
+#    ))
+#        
+sumtbl
+
+```
+
+```{r Fig1_plotoftwoparameters, echo=FALSE, fig.asp=.5, fig.cap='Figure 1. plot plot plotty plot'}
+
+solar_df <- my_df %>%
+  select(time, solar) %>%
+  # pivot_longer(cols=c("solar"), names_to = var, values_to = values)
+  pivot_longer(cols= c('solar'), names_to="var", values_to="values")
+
+temp_df  <- my_df %>%
+  select(time, airtemp) %>%
+  # pivot_longer(cols=c("solar"), names_to = var, values_to = values)
+  pivot_longer(cols= c('airtemp'), names_to="var", values_to="values")
+  
+plot_1 <- solar_df %>%
+  ggplot(aes(x=time, y=values)) +
+  theme_bw() +
+  geom_line(color='darkred') +
+  ylab("solar radiation (W/m^2)") +
+  xlab("time") +
+  theme(axis.line = element_line(colour = "black"),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    panel.border = element_blank(),
+    panel.background = element_blank()) +
+  scale_x_continuous(
+    breaks = c(0, 60, 120, 180),
+    label = c("12:20","13:20", "14:20", "15:20")
+  )
+
+plot_2 <- temp_df %>%
+  ggplot(aes(x=time, y=values)) +
+  theme_bw() +
+  geom_line(color='darkred') +
+  ylab("air temperature (°C)") +
+  xlab("time") +
+  theme(axis.line = element_line(colour = "black"),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    panel.border = element_blank(),
+    panel.background = element_blank()) +
+  scale_x_continuous(
+    breaks = c(0, 60, 120, 180),
+    label = c("12:20","13:20", "14:20", "15:20")
+  )
+
+ # temperature (°C)
+# combine into a figure
+figure <- ggarrange(plot_2, plot_1,
+                    labels = c("Air Temperature", "Solar Radiation"))
+                    
+
+annotate_figure(figure,top = text_grob("ATMOS41 sensor values over time",
+                   color = "black", face = "bold", size = 12))
+
+
+```
+
+```{r}
+# develop a summary table of the parameters
+
+
+```
+
